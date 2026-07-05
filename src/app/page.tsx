@@ -11,7 +11,7 @@ import { VocabularyManager } from "@/components/VocabularyManager";
 import { useVisionEngine } from "@/hooks/useVisionEngine";
 import { useAppStore } from "@/store/useAppStore";
 import { openTranslatorPictureInPicture } from "@/lib/pip";
-import { synthesizeSpeech } from "@/lib/services/speech";
+import { speakWithBrowser, synthesizeSpeech } from "@/lib/services/speech";
 import { applyTheme, getInitialDarkMode } from "@/lib/theme";
 import type { InputSource } from "@/types";
 
@@ -65,9 +65,14 @@ export default function Home() {
   useEffect(() => {
     const last = transcript[transcript.length - 1];
     if (!last || last.id === lastSpokenIdRef.current) return;
-    if (!settings.voiceEnabled || !settings.elevenLabsApiKey) return;
+    if (!settings.voiceEnabled) return;
 
     lastSpokenIdRef.current = last.id;
+    if (!settings.elevenLabsApiKey.trim()) {
+      speakWithBrowser(last.text);
+      return;
+    }
+
     synthesizeSpeech(last.text, settings.elevenLabsApiKey, settings.voiceId)
       .then((url) => {
         audioRef.current?.pause();

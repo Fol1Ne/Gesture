@@ -76,3 +76,16 @@ export async function synthesizeSpeech(
   const blob = await res.blob();
   return URL.createObjectURL(blob);
 }
+
+export function speakWithBrowser(text: string): boolean {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(trimmed);
+  utterance.rate = 1;
+  utterance.pitch = 1;
+  window.speechSynthesis.speak(utterance);
+  return true;
+}

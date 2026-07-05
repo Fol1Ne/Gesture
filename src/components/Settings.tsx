@@ -168,7 +168,8 @@ export function Settings({ onStart, onStop }: SettingsProps) {
             ))}
           </select>
           <p className="text-[11px] leading-snug text-[var(--muted)]">
-            Key is kept in memory only and sent directly to ElevenLabs.
+            Leave the key blank to use your browser&apos;s built-in speech voice.
+            ElevenLabs keys are kept in memory only.
           </p>
         </div>
       )}
