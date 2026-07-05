@@ -23,7 +23,7 @@ const HAND_MODEL =
   "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
 const POSE_MODEL =
-  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task";
 
 const FACE_MODEL =
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task";
@@ -64,9 +64,9 @@ export async function initVisionEngine(
       baseOptions: { modelAssetPath: POSE_MODEL, delegate: "GPU" },
       runningMode: "VIDEO",
       numPoses: 1,
-      minPoseDetectionConfidence: 0.5,
-      minPosePresenceConfidence: 0.5,
-      minTrackingConfidence: 0.5,
+      minPoseDetectionConfidence: 0.35,
+      minPosePresenceConfidence: 0.35,
+      minTrackingConfidence: 0.35,
     });
 
     opts.onProgress?.("Loading face landmark model...");
@@ -167,10 +167,17 @@ export const HAND_CONNECTIONS: [number, number][] = [
 ];
 
 export const POSE_CONNECTIONS: [number, number][] = [
+  [0, 1], [1, 2], [2, 3], [3, 7], // left eye/ear contour
+  [0, 4], [4, 5], [5, 6], [6, 8], // right eye/ear contour
+  [9, 10], // mouth
   [11, 12], // shoulders
   [11, 13], [13, 15], // left arm
   [12, 14], [14, 16], // right arm
+  [15, 17], [17, 19], [19, 21], [15, 19], // left hand anchor
+  [16, 18], [18, 20], [20, 22], [16, 20], // right hand anchor
   [11, 23], [12, 24], [23, 24], // torso
+  [23, 25], [25, 27], [27, 29], [29, 31], [27, 31], // left leg/foot
+  [24, 26], [26, 28], [28, 30], [30, 32], [28, 32], // right leg/foot
 ];
 
 // Sparse face mesh connections focused on demo readability: contours, eyes,

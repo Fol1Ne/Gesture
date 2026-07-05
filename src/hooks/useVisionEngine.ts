@@ -26,6 +26,7 @@ import {
 import { FingerSpellingBuffer } from "@/lib/recognition/fingerSpelling";
 import { PredictionStabilizer } from "@/lib/recognition/stabilizer";
 import { useAppStore } from "@/store/useAppStore";
+import { recognizePersonalSign } from "@/lib/vocabulary/recognizer";
 import type { InputSource, RecognitionCandidate, VisionFrame } from "@/types";
 
 // Pause-to-finalize: if no new word is committed for this long, the
@@ -104,6 +105,12 @@ function drawSkeleton(
       ctx.moveTo(pa.x * w, pa.y * h);
       ctx.lineTo(pb.x * w, pb.y * h);
       ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(63, 185, 80, 0.9)";
+    for (const p of frame.pose.landmarks) {
+      ctx.beginPath();
+      ctx.arc(p.x * w, p.y * h, 3.5, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
@@ -203,6 +210,10 @@ export function useVisionEngine(
     });
   }, [store, videoRef]);
 
+  const captureRecentFrames = useCallback(() => {
+    return [...bufferRef.current.get()];
+  }, []);
+
   const tick = useCallback(() => {
     const video = videoRef.current;
     if (!video || !isVisionEngineReady()) {
@@ -247,17 +258,29 @@ export function useVisionEngine(
       });
 
       if (frame.hands.length > 0) {
+        const personalCandidate = recognizePersonalSign(window, store.getState().personalSigns);
         const wordCandidate =
-          templateRecognizer.classify(window) ?? demoRecognizer.classify(window);
+          personalCandidate && personalCandidate.confidence >= settings.confidenceThreshold
+            ? personalCandidate
+            : templateRecognizer.classify(window) ?? demoRecognizer.classify(window);
         const thresholdCandidate =
           wordCandidate && wordCandidate.confidence >= settings.confidenceThreshold
             ? wordCandidate
             : null;
-        const passesThreshold = applyValidatedReadout(
-          thresholdCandidate,
-          window,
-          displayFps
-        );
+        const passesThreshold =
+          thresholdCandidate && personalCandidate === thresholdCandidate
+            ? thresholdCandidate
+            : applyValidatedReadout(thresholdCandidate, window, displayFps);
+
+        if (thresholdCandidate && personalCandidate === thresholdCandidate) {
+          store.getState().setDebugMetrics({
+            recognitionStatus: "stabilizing",
+            databaseMatch: thresholdCandidate.databaseScore ?? thresholdCandidate.confidence,
+          });
+          store
+            .getState()
+            .setLiveReadout(thresholdCandidate.label, thresholdCandidate.confidence, displayFps);
+        }
 
         wordStabilizerRef.current.setRequiredFrames(settings.stableFramesRequired);
         const committedWord = wordStabilizerRef.current.observe(passesThreshold);
@@ -387,5 +410,5 @@ export function useVisionEngine(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { start, stop };
+  return { start, stop, captureRecentFrames };
 }

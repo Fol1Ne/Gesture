@@ -7,6 +7,7 @@ import { Transcript } from "@/components/Transcript";
 import { Settings } from "@/components/Settings";
 import { Overlay } from "@/components/Overlay";
 import { RecognitionPanel } from "@/components/RecognitionPanel";
+import { VocabularyManager } from "@/components/VocabularyManager";
 import { useVisionEngine } from "@/hooks/useVisionEngine";
 import { useAppStore } from "@/store/useAppStore";
 import { openTranslatorPictureInPicture } from "@/lib/pip";
@@ -17,7 +18,7 @@ import type { InputSource } from "@/types";
 export default function Home() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { start, stop } = useVisionEngine(videoRef, canvasRef);
+  const { start, stop, captureRecentFrames } = useVisionEngine(videoRef, canvasRef);
 
   const settings = useAppStore((s) => s.settings);
   const transcript = useAppStore((s) => s.transcript);
@@ -92,6 +93,7 @@ export default function Home() {
             <CameraView videoRef={videoRef} canvasRef={canvasRef} />
             <Transcript />
             <RecognitionPanel />
+            <VocabularyManager captureRecentFrames={captureRecentFrames} />
           </div>
           <Settings onStart={handleStart} onStop={handleStop} />
         </div>

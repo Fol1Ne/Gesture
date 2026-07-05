@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { AppSettings, RecognitionDebugMetrics, TranscriptEntry } from "@/types";
 import { databaseCoverage } from "@/lib/database/schema";
 import { DEFAULT_VOICES } from "@/lib/services/speech";
+import type { PersonalSign } from "@/lib/vocabulary/types";
 
 export type CameraStatus = "idle" | "loading" | "running" | "error";
 
@@ -21,6 +22,9 @@ interface AppState {
   // transcript history (finalized sentences)
   transcript: TranscriptEntry[];
 
+  // user-trained signs
+  personalSigns: PersonalSign[];
+
   // settings
   settings: AppSettings;
 
@@ -33,6 +37,9 @@ interface AppState {
   setActiveSentence: (s: string) => void;
   commitSentence: (text: string) => void;
   clearTranscript: () => void;
+  setPersonalSigns: (signs: PersonalSign[]) => void;
+  upsertPersonalSign: (sign: PersonalSign) => void;
+  removePersonalSign: (id: string) => void;
   updateSettings: (partial: Partial<AppSettings>) => void;
 }
 
@@ -78,6 +85,7 @@ export const useAppStore = create<AppState>((set) => ({
   debugMetrics: defaultDebugMetrics,
 
   transcript: [],
+  personalSigns: [],
 
   settings: defaultSettings,
 
@@ -107,6 +115,18 @@ export const useAppStore = create<AppState>((set) => ({
       activeSentence: "",
     })),
   clearTranscript: () => set({ transcript: [], activeSentence: "" }),
+  setPersonalSigns: (signs) => set({ personalSigns: signs }),
+  upsertPersonalSign: (sign) =>
+    set((state) => ({
+      personalSigns: [
+        ...state.personalSigns.filter((existing) => existing.id !== sign.id),
+        sign,
+      ].sort((a, b) => a.word.localeCompare(b.word)),
+    })),
+  removePersonalSign: (id) =>
+    set((state) => ({
+      personalSigns: state.personalSigns.filter((sign) => sign.id !== id),
+    })),
   updateSettings: (partial) =>
     set((state) => ({ settings: { ...state.settings, ...partial } })),
 }));
