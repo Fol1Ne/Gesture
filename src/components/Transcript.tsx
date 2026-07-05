@@ -28,7 +28,7 @@ export function Transcript() {
   };
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm">
+    <div className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.24)]">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-[var(--text)]">Transcript</h2>
         <div className="flex items-center gap-1.5">
@@ -83,7 +83,7 @@ export function Transcript() {
           <button
             onClick={handleInsert}
             disabled={!fullText}
-            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-[#0D1117] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Insert
           </button>
@@ -94,7 +94,7 @@ export function Transcript() {
           onChange={(e) => setChatValue(e.target.value)}
           placeholder="Signed text lands here — paste into Slack, Teams, or any form field."
           rows={3}
-          className="w-full resize-none rounded-xl border border-[var(--border)] bg-white p-3 text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+          className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3 text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
         />
       </div>
     </div>

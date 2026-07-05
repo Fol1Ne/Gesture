@@ -6,6 +6,7 @@ import { CameraView } from "@/components/CameraView";
 import { Transcript } from "@/components/Transcript";
 import { Settings } from "@/components/Settings";
 import { Overlay } from "@/components/Overlay";
+import { RecognitionPanel } from "@/components/RecognitionPanel";
 import { useVisionEngine } from "@/hooks/useVisionEngine";
 import { useAppStore } from "@/store/useAppStore";
 import { synthesizeSpeech } from "@/lib/services/speech";
@@ -52,10 +53,11 @@ export default function Home() {
     <div className="flex min-h-screen flex-col bg-[var(--bg)]">
       <Header />
 
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8 lg:px-10">
-        <div className="flex flex-col gap-6 lg:flex-row">
-          <div className="flex flex-1 flex-col gap-6">
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-5 py-6 lg:px-8">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="flex min-w-0 flex-col gap-6">
             <CameraView videoRef={videoRef} canvasRef={canvasRef} />
+            <RecognitionPanel />
             <Transcript />
           </div>
           <Settings onStart={handleStart} onStop={handleStop} />
@@ -63,9 +65,8 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-[var(--border)] px-6 py-4 text-center text-xs text-[var(--muted)] lg:px-10">
-        Gesture is a hackathon prototype. Recognition runs entirely in your
-        browser via MediaPipe — no video leaves your device unless you enable
-        voice output.
+        Gesture v3 runs landmark extraction in your browser. Video stays local
+        unless voice output is enabled.
       </footer>
 
       {settings.overlayMode && (

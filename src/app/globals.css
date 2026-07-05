@@ -1,25 +1,31 @@
 @import "tailwindcss";
 
-/* Design tokens per PRD: Linear/Raycast-style minimalism, no gradients. */
+/* ASL Translator v3 tokens: dark developer-tool aesthetic. */
 :root {
-  --bg: #FAFAFA;
-  --card: #FFFFFF;
-  --accent: #2563EB;
-  --text: #111827;
-  --muted: #6B7280;
-  --border: #E5E7EB;
+  --bg: #0D1117;
+  --card: #161B22;
+  --accent: #58A6FF;
+  --success: #3FB950;
+  --warning: #D29922;
+  --danger: #F85149;
+  --text: #F0F6FC;
+  --muted: #8B949E;
+  --border: #30363D;
 
   --background: var(--bg);
   --foreground: var(--text);
 }
 
 .dark {
-  --bg: #0B0D12;
-  --card: #12151C;
-  --accent: #3B82F6;
-  --text: #F3F4F6;
-  --muted: #8B93A1;
-  --border: #232733;
+  --bg: #0D1117;
+  --card: #161B22;
+  --accent: #58A6FF;
+  --success: #3FB950;
+  --warning: #D29922;
+  --danger: #F85149;
+  --text: #F0F6FC;
+  --muted: #8B949E;
+  --border: #30363D;
 
   --background: var(--bg);
   --foreground: var(--text);
@@ -33,8 +39,9 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Inter",
-    "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace,
+    SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Some components render on a dark canvas (overlay, camera frame) regardless

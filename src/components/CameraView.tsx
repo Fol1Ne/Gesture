@@ -18,6 +18,7 @@ export const CameraView = forwardRef<HTMLDivElement, CameraViewProps>(
     const currentConfidence = useAppStore((s) => s.currentConfidence);
     const fps = useAppStore((s) => s.fps);
     const inputSource = useAppStore((s) => s.settings.inputSource);
+    const landmarkCount = useAppStore((s) => s.debugMetrics.landmarkCount);
 
     const isRunning = cameraStatus === "running";
     const isLoading = cameraStatus === "loading";
@@ -25,7 +26,7 @@ export const CameraView = forwardRef<HTMLDivElement, CameraViewProps>(
     return (
       <div
         ref={ref}
-        className="relative w-full overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-sm"
+        className="relative w-full overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-[0_18px_60px_rgba(0,0,0,0.28)]"
       >
         <div className="relative aspect-video w-full bg-[#0B0D12]">
           <video
@@ -65,12 +66,15 @@ export const CameraView = forwardRef<HTMLDivElement, CameraViewProps>(
           {isRunning && (
             <>
               <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/50 px-3 py-1.5 text-xs font-medium text-white backdrop-blur">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
-                Live
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--success)]" />
+                Live wireframe
               </div>
               <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-xs font-medium text-white backdrop-blur">
                 <Gauge size={13} />
                 {fps} FPS
+              </div>
+              <div className="absolute right-3 top-12 rounded-full bg-black/50 px-3 py-1.5 text-xs font-medium text-white/80 backdrop-blur">
+                {landmarkCount}/543 landmarks
               </div>
               {currentSign && (
                 <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-xl bg-black/60 px-3.5 py-2 backdrop-blur">
