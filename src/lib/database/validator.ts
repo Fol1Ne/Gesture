@@ -50,13 +50,15 @@ export function validateCandidate(
     Math.max(1, entry.requiredChannels.length);
 
   const facialScore =
-    entry.requiredFacialFeatures.length === 0 ? 1 : channelCoverage(window, "face");
+    entry.requiresFace || entry.requiredFacialFeatures.length > 0 ? channelCoverage(window, "face") : 1;
+  const poseScore = entry.requiresPose ? channelCoverage(window, "pose") : 1;
   const motionScore = motionCoverage(window);
-  const landmarkScore = requiredCoverage * 0.5 + facialScore * 0.2 + motionScore * 0.3;
+  const landmarkScore =
+    requiredCoverage * 0.4 + facialScore * 0.2 + poseScore * 0.15 + motionScore * 0.25;
   const score = Math.min(1, candidate.confidence * 0.55 + landmarkScore * 0.45);
 
   return {
-    candidate: { ...candidate, databaseScore: score },
+    candidate: { ...candidate, databaseScore: score, cooldownMs: entry.cooldownMs },
     score,
     accepted: score >= entry.confidenceThreshold * 0.85,
   };

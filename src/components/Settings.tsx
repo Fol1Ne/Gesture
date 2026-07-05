@@ -5,6 +5,7 @@ import {
   Layers,
   MonitorUp,
   Moon,
+  PictureInPicture2,
   Play,
   Square,
   Sun,
@@ -121,6 +122,12 @@ export function Settings({ onStart, onStop }: SettingsProps) {
           onChange={(v) => updateSettings({ overlayMode: v })}
           label="Overlay mode"
           icon={<Layers size={15} />}
+        />
+        <Toggle
+          checked={settings.pipMode}
+          onChange={(v) => updateSettings({ pipMode: v })}
+          label="Picture-in-Picture"
+          icon={<PictureInPicture2 size={15} />}
         />
         <Toggle
           checked={settings.voiceEnabled}

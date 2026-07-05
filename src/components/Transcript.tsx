@@ -52,7 +52,7 @@ export function Transcript() {
       </div>
 
       <div
-        className="min-h-[88px] rounded-xl bg-[var(--bg)] p-4 text-[15px] leading-relaxed text-[var(--text)]"
+        className="min-h-[112px] rounded-xl bg-[var(--bg)] p-5 text-xl leading-relaxed text-[var(--text)] transition-colors"
         aria-live="polite"
       >
         {fullText ? (

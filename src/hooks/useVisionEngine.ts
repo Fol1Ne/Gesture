@@ -11,14 +11,20 @@ import {
   isVisionEngineReady,
 } from "@/lib/vision/mediapipe";
 import { FrameBuffer, StabilityVoter } from "@/lib/vision/buffer";
-import { demoRecognizer, fingerspellRecognizer } from "@/lib/vision/recognizer";
+import {
+  demoRecognizer,
+  fingerspellRecognizer,
+  templateRecognizer,
+} from "@/lib/vision/recognizer";
 import { validateCandidate } from "@/lib/database/validator";
 import {
-  appendWord,
-  createCleanupState,
+  appendRecognizedWord,
+  createSentenceState,
   finalizeSentence,
   renderSentence,
-} from "@/lib/services/transcriptCleanup";
+} from "@/lib/recognition/sentenceBuilder";
+import { FingerSpellingBuffer } from "@/lib/recognition/fingerSpelling";
+import { PredictionStabilizer } from "@/lib/recognition/stabilizer";
 import { useAppStore } from "@/store/useAppStore";
 import type { InputSource, RecognitionCandidate, VisionFrame } from "@/types";
 
@@ -33,6 +39,18 @@ function landmarkCount(frame: VisionFrame | null): number {
     (frame.pose?.landmarks.length ?? 0) +
     frame.hands.reduce((sum, hand) => sum + hand.landmarks.length, 0)
   );
+}
+
+function landmarkCounts(frame: VisionFrame | null) {
+  const leftHand = frame?.hands.find((hand) => hand.handedness === "Left");
+  const rightHand = frame?.hands.find((hand) => hand.handedness === "Right");
+
+  return {
+    faceLandmarkCount: frame?.face?.landmarks.length ?? 0,
+    poseLandmarkCount: frame?.pose?.landmarks.length ?? 0,
+    leftHandLandmarkCount: leftHand?.landmarks.length ?? 0,
+    rightHandLandmarkCount: rightHand?.landmarks.length ?? 0,
+  };
 }
 
 function trackingState(frame: VisionFrame | null) {
@@ -117,10 +135,12 @@ export function useVisionEngine(
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const bufferRef = useRef(new FrameBuffer(60));
-  const voterRef = useRef(new StabilityVoter(8));
+  const wordStabilizerRef = useRef(
+    new PredictionStabilizer({ requiredFrames: 8, defaultCooldownMs: 1200 })
+  );
   const letterVoterRef = useRef(new StabilityVoter(10));
-  const letterRunRef = useRef<string[]>([]);
-  const cleanupStateRef = useRef(createCleanupState());
+  const fingerSpellingRef = useRef(new FingerSpellingBuffer());
+  const cleanupStateRef = useRef(createSentenceState());
   const lastCommitAtRef = useRef<number>(0);
   const fpsCounterRef = useRef({ frames: 0, last: 0 });
   const tickRef = useRef<() => void>(() => {});
@@ -164,10 +184,10 @@ export function useVisionEngine(
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     bufferRef.current.clear();
-    voterRef.current.reset();
+    wordStabilizerRef.current.reset();
     letterVoterRef.current.reset();
-    letterRunRef.current = [];
-    cleanupStateRef.current = createCleanupState();
+    fingerSpellingRef.current.reset();
+    cleanupStateRef.current = createSentenceState();
     store.getState().setCameraStatus("idle");
     store.getState().setLiveReadout(null, 0, 0);
     store.getState().setDebugMetrics({
@@ -176,6 +196,10 @@ export function useVisionEngine(
       frameBufferSize: 0,
       databaseMatch: 0,
       landmarkCount: 0,
+      faceLandmarkCount: 0,
+      poseLandmarkCount: 0,
+      leftHandLandmarkCount: 0,
+      rightHandLandmarkCount: 0,
     });
   }, [store, videoRef]);
 
@@ -219,10 +243,12 @@ export function useVisionEngine(
         recognitionStatus: "running",
         frameBufferSize: window.length,
         landmarkCount: landmarkCount(frame),
+        ...landmarkCounts(frame),
       });
 
       if (frame.hands.length > 0) {
-        const wordCandidate = demoRecognizer.classify(window);
+        const wordCandidate =
+          templateRecognizer.classify(window) ?? demoRecognizer.classify(window);
         const thresholdCandidate =
           wordCandidate && wordCandidate.confidence >= settings.confidenceThreshold
             ? wordCandidate
@@ -233,13 +259,11 @@ export function useVisionEngine(
           displayFps
         );
 
-        voterRef.current.setRequiredFrames(settings.stableFramesRequired);
-        const committedWord = voterRef.current.observe(
-          passesThreshold ? { label: passesThreshold.label, confidence: passesThreshold.confidence } : null
-        );
+        wordStabilizerRef.current.setRequiredFrames(settings.stableFramesRequired);
+        const committedWord = wordStabilizerRef.current.observe(passesThreshold);
 
         if (committedWord) {
-          cleanupStateRef.current = appendWord(cleanupStateRef.current, committedWord);
+          cleanupStateRef.current = appendRecognizedWord(cleanupStateRef.current, committedWord.label);
           store.getState().setActiveSentence(renderSentence(cleanupStateRef.current));
           lastCommitAtRef.current = Date.now();
         } else if (!passesThreshold) {
@@ -257,19 +281,22 @@ export function useVisionEngine(
           const committedLetter = letterVoterRef.current.observe(
             letterOk ? { label: letterOk.label, confidence: letterOk.confidence } : null
           );
+          const spelledWord = fingerSpellingRef.current.observe(committedLetter);
           if (committedLetter) {
-            letterRunRef.current.push(committedLetter);
             lastCommitAtRef.current = Date.now();
-          } else if (letterRunRef.current.length && !letterOk) {
-            // Hand shape changed away from a letter — collapse the run into a word.
-            const word = letterRunRef.current.join("");
-            letterRunRef.current = [];
-            cleanupStateRef.current = appendWord(cleanupStateRef.current, word);
+          }
+          if (spelledWord) {
+            cleanupStateRef.current = appendRecognizedWord(cleanupStateRef.current, spelledWord);
             store.getState().setActiveSentence(renderSentence(cleanupStateRef.current));
           }
         }
       } else {
-        voterRef.current.observe(null);
+        wordStabilizerRef.current.observe(null);
+        const spelledWord = fingerSpellingRef.current.observe(null);
+        if (spelledWord) {
+          cleanupStateRef.current = appendRecognizedWord(cleanupStateRef.current, spelledWord);
+          store.getState().setActiveSentence(renderSentence(cleanupStateRef.current));
+        }
         store.getState().setDebugMetrics({
           recognitionStatus: "running",
           databaseMatch: 0,
@@ -280,6 +307,10 @@ export function useVisionEngine(
         recognitionStatus: "running",
         frameBufferSize: bufferRef.current.length,
         landmarkCount: 0,
+        faceLandmarkCount: 0,
+        poseLandmarkCount: 0,
+        leftHandLandmarkCount: 0,
+        rightHandLandmarkCount: 0,
       });
     }
 

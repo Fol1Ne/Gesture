@@ -40,6 +40,7 @@ export interface RecognitionCandidate {
   confidence: number; // 0..1
   kind: "word" | "letter";
   databaseScore?: number; // 0..1 similarity score from the internal ASL database
+  cooldownMs?: number;
 }
 
 /** A word/letter that has survived temporal smoothing and been committed. */
@@ -78,6 +79,13 @@ export interface RecognitionDebugMetrics {
   frameBufferSize: number;
   databaseMatch: number;
   landmarkCount: number;
+  faceLandmarkCount: number;
+  poseLandmarkCount: number;
+  leftHandLandmarkCount: number;
+  rightHandLandmarkCount: number;
+  totalSigns: number;
+  signsWithSamples: number;
+  requiredSamplesPerSign: number;
 }
 
 export interface AppSettings {
@@ -87,6 +95,7 @@ export interface AppSettings {
   confidenceThreshold: number; // 0..1, min confidence to consider a candidate
   stableFramesRequired: number; // frames needed before committing a word
   overlayMode: boolean;
+  pipMode: boolean;
   darkMode: boolean;
   inputSource: InputSource;
 }

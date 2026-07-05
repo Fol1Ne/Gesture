@@ -9,7 +9,9 @@ import { Overlay } from "@/components/Overlay";
 import { RecognitionPanel } from "@/components/RecognitionPanel";
 import { useVisionEngine } from "@/hooks/useVisionEngine";
 import { useAppStore } from "@/store/useAppStore";
+import { openTranslatorPictureInPicture } from "@/lib/pip";
 import { synthesizeSpeech } from "@/lib/services/speech";
+import { applyTheme, getInitialDarkMode } from "@/lib/theme";
 import type { InputSource } from "@/types";
 
 export default function Home() {
@@ -19,13 +21,44 @@ export default function Home() {
 
   const settings = useAppStore((s) => s.settings);
   const transcript = useAppStore((s) => s.transcript);
+  const activeSentence = useAppStore((s) => s.activeSentence);
+  const currentSign = useAppStore((s) => s.currentSign);
+  const updateSettings = useAppStore((s) => s.updateSettings);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastSpokenIdRef = useRef<string | null>(null);
+  const pipOpeningRef = useRef(false);
+  const pipOpenedRef = useRef(false);
 
-  // Dark mode: toggle a class on <html> so the whole design-token set flips.
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", settings.darkMode);
+    updateSettings({ darkMode: getInitialDarkMode() });
+  }, [updateSettings]);
+
+  useEffect(() => {
+    applyTheme(settings.darkMode);
   }, [settings.darkMode]);
+
+  useEffect(() => {
+    if (!settings.pipMode) {
+      pipOpenedRef.current = false;
+      return;
+    }
+    if (pipOpeningRef.current || pipOpenedRef.current) return;
+
+    pipOpeningRef.current = true;
+    const text = [...transcript.map((t) => t.text), activeSentence].filter(Boolean).join(" ");
+    openTranslatorPictureInPicture({
+      video: videoRef.current,
+      canvas: canvasRef.current,
+      currentWord: currentSign,
+      transcript: text,
+    }).catch((err) => {
+      console.error("Picture-in-Picture failed:", err);
+      updateSettings({ pipMode: false });
+    }).finally(() => {
+      pipOpenedRef.current = true;
+      pipOpeningRef.current = false;
+    });
+  }, [settings.pipMode, transcript, activeSentence, currentSign, updateSettings]);
 
   // Speech output: speak newly committed sentences when voice is enabled.
   useEffect(() => {
@@ -57,15 +90,15 @@ export default function Home() {
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="flex min-w-0 flex-col gap-6">
             <CameraView videoRef={videoRef} canvasRef={canvasRef} />
-            <RecognitionPanel />
             <Transcript />
+            <RecognitionPanel />
           </div>
           <Settings onStart={handleStart} onStop={handleStop} />
         </div>
       </main>
 
       <footer className="border-t border-[var(--border)] px-6 py-4 text-center text-xs text-[var(--muted)] lg:px-10">
-        Gesture v3 runs landmark extraction in your browser. Video stays local
+        Gesture v4 runs landmark extraction in your browser. Video stays local
         unless voice output is enabled.
       </footer>
 

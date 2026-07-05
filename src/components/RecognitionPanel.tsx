@@ -92,8 +92,33 @@ export function RecognitionPanel() {
           icon={<Database size={13} />}
         />
         <Metric
+          label="Vocabulary"
+          value={`${debug.totalSigns} signs`}
+          icon={<Database size={13} />}
+        />
+        <Metric
+          label="Recorded"
+          value={`${debug.signsWithSamples}/${debug.totalSigns}`}
+          icon={<Database size={13} />}
+        />
+        <Metric
           label="Landmarks"
           value={`${debug.landmarkCount}/543`}
+          icon={<ScanFace size={13} />}
+        />
+        <Metric
+          label="Face"
+          value={`${debug.faceLandmarkCount}`}
+          icon={<ScanFace size={13} />}
+        />
+        <Metric
+          label="Pose"
+          value={`${debug.poseLandmarkCount}`}
+          icon={<ScanFace size={13} />}
+        />
+        <Metric
+          label="Hands"
+          value={`${debug.leftHandLandmarkCount}/${debug.rightHandLandmarkCount}`}
           icon={<ScanFace size={13} />}
         />
         <Metric label="FPS" value={`${fps}`} icon={<Activity size={13} />} />

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { AppSettings, RecognitionDebugMetrics, TranscriptEntry } from "@/types";
+import { databaseCoverage } from "@/lib/database/schema";
 import { DEFAULT_VOICES } from "@/lib/services/speech";
 
 export type CameraStatus = "idle" | "loading" | "running" | "error";
@@ -42,11 +43,13 @@ const defaultSettings: AppSettings = {
   confidenceThreshold: 0.6,
   stableFramesRequired: 8,
   overlayMode: false,
+  pipMode: false,
   darkMode: true,
   inputSource: "webcam",
 };
 
 const defaultDebugMetrics: RecognitionDebugMetrics = {
+  ...databaseCoverage(),
   tracking: {
     face: false,
     pose: false,
@@ -57,6 +60,10 @@ const defaultDebugMetrics: RecognitionDebugMetrics = {
   frameBufferSize: 0,
   databaseMatch: 0,
   landmarkCount: 0,
+  faceLandmarkCount: 0,
+  poseLandmarkCount: 0,
+  leftHandLandmarkCount: 0,
+  rightHandLandmarkCount: 0,
 };
 
 export const useAppStore = create<AppState>((set) => ({
