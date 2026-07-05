@@ -21,11 +21,17 @@ export interface PoseFrame {
   landmarks: Point3D[];
 }
 
+/** MediaPipe face mesh frame: 468 normalized facial landmarks. */
+export interface FaceFrame {
+  landmarks: Point3D[];
+}
+
 /** One sampled instant of the input stream, after MediaPipe inference. */
 export interface VisionFrame {
   timestampMs: number;
   hands: HandFrame[];
   pose: PoseFrame | null;
+  face: FaceFrame | null;
 }
 
 /** Result emitted by the recognition engine for a single frame or window. */
@@ -33,6 +39,8 @@ export interface RecognitionCandidate {
   label: string; // e.g. "HELLO", or a single letter "H" for fingerspelling
   confidence: number; // 0..1
   kind: "word" | "letter";
+  databaseScore?: number; // 0..1 similarity score from the internal ASL database
+  cooldownMs?: number;
 }
 
 /** A word/letter that has survived temporal smoothing and been committed. */
@@ -58,6 +66,28 @@ export interface RecognizerEngineInfo {
   isPretrained: boolean;
 }
 
+export interface TrackingState {
+  face: boolean;
+  pose: boolean;
+  leftHand: boolean;
+  rightHand: boolean;
+}
+
+export interface RecognitionDebugMetrics {
+  tracking: TrackingState;
+  recognitionStatus: "idle" | "running" | "validating" | "stabilizing";
+  frameBufferSize: number;
+  databaseMatch: number;
+  landmarkCount: number;
+  faceLandmarkCount: number;
+  poseLandmarkCount: number;
+  leftHandLandmarkCount: number;
+  rightHandLandmarkCount: number;
+  totalSigns: number;
+  signsWithSamples: number;
+  requiredSamplesPerSign: number;
+}
+
 export interface AppSettings {
   voiceEnabled: boolean;
   voiceId: string;
@@ -65,6 +95,7 @@ export interface AppSettings {
   confidenceThreshold: number; // 0..1, min confidence to consider a candidate
   stableFramesRequired: number; // frames needed before committing a word
   overlayMode: boolean;
+  pipMode: boolean;
   darkMode: boolean;
   inputSource: InputSource;
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import {
+  FACE_CONNECTIONS,
   HAND_CONNECTIONS,
   POSE_CONNECTIONS,
   detectFrame,
@@ -10,19 +11,56 @@ import {
   isVisionEngineReady,
 } from "@/lib/vision/mediapipe";
 import { FrameBuffer, StabilityVoter } from "@/lib/vision/buffer";
-import { demoRecognizer, fingerspellRecognizer } from "@/lib/vision/recognizer";
 import {
-  appendWord,
-  createCleanupState,
+  demoRecognizer,
+  fingerspellRecognizer,
+  templateRecognizer,
+} from "@/lib/vision/recognizer";
+import { validateCandidate } from "@/lib/database/validator";
+import {
+  appendRecognizedWord,
+  createSentenceState,
   finalizeSentence,
   renderSentence,
-} from "@/lib/services/transcriptCleanup";
+} from "@/lib/recognition/sentenceBuilder";
+import { FingerSpellingBuffer } from "@/lib/recognition/fingerSpelling";
+import { PredictionStabilizer } from "@/lib/recognition/stabilizer";
 import { useAppStore } from "@/store/useAppStore";
-import type { InputSource } from "@/types";
+import type { InputSource, RecognitionCandidate, VisionFrame } from "@/types";
 
 // Pause-to-finalize: if no new word is committed for this long, the
 // in-progress sentence is finalized into the transcript.
 const SENTENCE_TIMEOUT_MS = 2500;
+
+function landmarkCount(frame: VisionFrame | null): number {
+  if (!frame) return 0;
+  return (
+    (frame.face?.landmarks.length ?? 0) +
+    (frame.pose?.landmarks.length ?? 0) +
+    frame.hands.reduce((sum, hand) => sum + hand.landmarks.length, 0)
+  );
+}
+
+function landmarkCounts(frame: VisionFrame | null) {
+  const leftHand = frame?.hands.find((hand) => hand.handedness === "Left");
+  const rightHand = frame?.hands.find((hand) => hand.handedness === "Right");
+
+  return {
+    faceLandmarkCount: frame?.face?.landmarks.length ?? 0,
+    poseLandmarkCount: frame?.pose?.landmarks.length ?? 0,
+    leftHandLandmarkCount: leftHand?.landmarks.length ?? 0,
+    rightHandLandmarkCount: rightHand?.landmarks.length ?? 0,
+  };
+}
+
+function trackingState(frame: VisionFrame | null) {
+  return {
+    face: !!frame?.face?.landmarks.length,
+    pose: !!frame?.pose?.landmarks.length,
+    leftHand: !!frame?.hands.some((hand) => hand.handedness === "Left"),
+    rightHand: !!frame?.hands.some((hand) => hand.handedness === "Right"),
+  };
+}
 
 function drawSkeleton(
   canvas: HTMLCanvasElement,
@@ -41,8 +79,22 @@ function drawSkeleton(
   const w = canvas.width;
   const h = canvas.height;
 
+  if (frame.face) {
+    ctx.strokeStyle = "rgba(88, 166, 255, 0.34)";
+    ctx.lineWidth = 1;
+    for (const [a, b] of FACE_CONNECTIONS) {
+      const pa = frame.face.landmarks[a];
+      const pb = frame.face.landmarks[b];
+      if (!pa || !pb) continue;
+      ctx.beginPath();
+      ctx.moveTo(pa.x * w, pa.y * h);
+      ctx.lineTo(pb.x * w, pb.y * h);
+      ctx.stroke();
+    }
+  }
+
   if (frame.pose) {
-    ctx.strokeStyle = "rgba(37, 99, 235, 0.5)";
+    ctx.strokeStyle = "rgba(63, 185, 80, 0.58)";
     ctx.lineWidth = 3;
     for (const [a, b] of POSE_CONNECTIONS) {
       const pa = frame.pose.landmarks[a];
@@ -56,7 +108,7 @@ function drawSkeleton(
   }
 
   for (const hand of frame.hands) {
-    ctx.strokeStyle = "#2563EB";
+    ctx.strokeStyle = hand.handedness === "Left" ? "#58A6FF" : "#3FB950";
     ctx.lineWidth = 2.5;
     for (const [a, b] of HAND_CONNECTIONS) {
       const pa = hand.landmarks[a];
@@ -67,7 +119,7 @@ function drawSkeleton(
       ctx.lineTo(pb.x * w, pb.y * h);
       ctx.stroke();
     }
-    ctx.fillStyle = "#111827";
+    ctx.fillStyle = "#F0F6FC";
     for (const p of hand.landmarks) {
       ctx.beginPath();
       ctx.arc(p.x * w, p.y * h, 3, 0, Math.PI * 2);
@@ -83,15 +135,47 @@ export function useVisionEngine(
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const bufferRef = useRef(new FrameBuffer(60));
-  const voterRef = useRef(new StabilityVoter(8));
+  const wordStabilizerRef = useRef(
+    new PredictionStabilizer({ requiredFrames: 8, defaultCooldownMs: 1200 })
+  );
   const letterVoterRef = useRef(new StabilityVoter(10));
-  const letterRunRef = useRef<string[]>([]);
-  const cleanupStateRef = useRef(createCleanupState());
+  const fingerSpellingRef = useRef(new FingerSpellingBuffer());
+  const cleanupStateRef = useRef(createSentenceState());
   const lastCommitAtRef = useRef<number>(0);
   const fpsCounterRef = useRef({ frames: 0, last: 0 });
   const tickRef = useRef<() => void>(() => {});
 
   const store = useAppStore;
+
+  const applyValidatedReadout = useCallback(
+    (
+      candidate: RecognitionCandidate | null,
+      window: readonly VisionFrame[],
+      fps: number
+    ) => {
+      if (!candidate) {
+        store.getState().setDebugMetrics({
+          recognitionStatus: "running",
+          databaseMatch: 0,
+        });
+        return null;
+      }
+
+      const validation = validateCandidate(candidate, window);
+      store.getState().setDebugMetrics({
+        recognitionStatus: validation.accepted ? "stabilizing" : "validating",
+        databaseMatch: validation.score,
+      });
+
+      if (!validation.accepted) return null;
+
+      store
+        .getState()
+        .setLiveReadout(validation.candidate.label, validation.candidate.confidence, fps);
+      return validation.candidate;
+    },
+    [store]
+  );
 
   const stop = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -100,12 +184,23 @@ export function useVisionEngine(
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     bufferRef.current.clear();
-    voterRef.current.reset();
+    wordStabilizerRef.current.reset();
     letterVoterRef.current.reset();
-    letterRunRef.current = [];
-    cleanupStateRef.current = createCleanupState();
+    fingerSpellingRef.current.reset();
+    cleanupStateRef.current = createSentenceState();
     store.getState().setCameraStatus("idle");
     store.getState().setLiveReadout(null, 0, 0);
+    store.getState().setDebugMetrics({
+      tracking: { face: false, pose: false, leftHand: false, rightHand: false },
+      recognitionStatus: "idle",
+      frameBufferSize: 0,
+      databaseMatch: 0,
+      landmarkCount: 0,
+      faceLandmarkCount: 0,
+      poseLandmarkCount: 0,
+      leftHandLandmarkCount: 0,
+      rightHandLandmarkCount: 0,
+    });
   }, [store, videoRef]);
 
   const tick = useCallback(() => {
@@ -117,6 +212,7 @@ export function useVisionEngine(
 
     const now = performance.now();
     const frame = detectFrame(video, now);
+    const currentFps = store.getState().fps;
 
     // FPS tracking
     const fc = fpsCounterRef.current;
@@ -140,56 +236,82 @@ export function useVisionEngine(
       bufferRef.current.push(frame);
       const { settings } = store.getState();
       const window = bufferRef.current.get();
+      const displayFps = store.getState().fps || currentFps;
+
+      store.getState().setDebugMetrics({
+        tracking: trackingState(frame),
+        recognitionStatus: "running",
+        frameBufferSize: window.length,
+        landmarkCount: landmarkCount(frame),
+        ...landmarkCounts(frame),
+      });
 
       if (frame.hands.length > 0) {
-        const wordCandidate = demoRecognizer.classify(window);
-        const passesThreshold =
+        const wordCandidate =
+          templateRecognizer.classify(window) ?? demoRecognizer.classify(window);
+        const thresholdCandidate =
           wordCandidate && wordCandidate.confidence >= settings.confidenceThreshold
             ? wordCandidate
             : null;
-
-        voterRef.current.setRequiredFrames(settings.stableFramesRequired);
-        const committedWord = voterRef.current.observe(
-          passesThreshold ? { label: passesThreshold.label, confidence: passesThreshold.confidence } : null
+        const passesThreshold = applyValidatedReadout(
+          thresholdCandidate,
+          window,
+          displayFps
         );
 
-        if (passesThreshold) {
-          store
-            .getState()
-            .setLiveReadout(passesThreshold.label, passesThreshold.confidence, fc.frames);
-        }
+        wordStabilizerRef.current.setRequiredFrames(settings.stableFramesRequired);
+        const committedWord = wordStabilizerRef.current.observe(passesThreshold);
 
         if (committedWord) {
-          cleanupStateRef.current = appendWord(cleanupStateRef.current, committedWord);
+          cleanupStateRef.current = appendRecognizedWord(cleanupStateRef.current, committedWord.label);
           store.getState().setActiveSentence(renderSentence(cleanupStateRef.current));
           lastCommitAtRef.current = Date.now();
         } else if (!passesThreshold) {
           // Try fingerspelling only when no word-level sign is confidently seen.
           const letterCandidate = fingerspellRecognizer.classify(window);
-          const letterOk =
+          const letterCandidateOverThreshold =
             letterCandidate && letterCandidate.confidence >= settings.confidenceThreshold
               ? letterCandidate
               : null;
+          const letterOk = applyValidatedReadout(
+            letterCandidateOverThreshold,
+            window,
+            displayFps
+          );
           const committedLetter = letterVoterRef.current.observe(
             letterOk ? { label: letterOk.label, confidence: letterOk.confidence } : null
           );
-          if (letterOk) {
-            store.getState().setLiveReadout(letterOk.label, letterOk.confidence, fc.frames);
-          }
+          const spelledWord = fingerSpellingRef.current.observe(committedLetter);
           if (committedLetter) {
-            letterRunRef.current.push(committedLetter);
             lastCommitAtRef.current = Date.now();
-          } else if (letterRunRef.current.length && !letterOk) {
-            // Hand shape changed away from a letter — collapse the run into a word.
-            const word = letterRunRef.current.join("");
-            letterRunRef.current = [];
-            cleanupStateRef.current = appendWord(cleanupStateRef.current, word);
+          }
+          if (spelledWord) {
+            cleanupStateRef.current = appendRecognizedWord(cleanupStateRef.current, spelledWord);
             store.getState().setActiveSentence(renderSentence(cleanupStateRef.current));
           }
         }
       } else {
-        voterRef.current.observe(null);
+        wordStabilizerRef.current.observe(null);
+        const spelledWord = fingerSpellingRef.current.observe(null);
+        if (spelledWord) {
+          cleanupStateRef.current = appendRecognizedWord(cleanupStateRef.current, spelledWord);
+          store.getState().setActiveSentence(renderSentence(cleanupStateRef.current));
+        }
+        store.getState().setDebugMetrics({
+          recognitionStatus: "running",
+          databaseMatch: 0,
+        });
       }
+    } else {
+      store.getState().setDebugMetrics({
+        recognitionStatus: "running",
+        frameBufferSize: bufferRef.current.length,
+        landmarkCount: 0,
+        faceLandmarkCount: 0,
+        poseLandmarkCount: 0,
+        leftHandLandmarkCount: 0,
+        rightHandLandmarkCount: 0,
+      });
     }
 
     // Auto-finalize sentence after a pause in signing.
@@ -203,7 +325,7 @@ export function useVisionEngine(
     }
 
     rafRef.current = requestAnimationFrame(() => tickRef.current());
-  }, [store, videoRef, canvasRef]);
+  }, [store, videoRef, canvasRef, applyValidatedReadout]);
 
   useEffect(() => {
     tickRef.current = tick;

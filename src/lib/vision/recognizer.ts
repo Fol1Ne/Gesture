@@ -28,11 +28,33 @@ import type {
   RecognizerEngineInfo,
   VisionFrame,
 } from "@/types";
+import { supportedGlosses } from "@/lib/database/schema";
+import { matchLandmarkTemplate } from "@/lib/database/templates";
 
 export interface RecognizerEngine {
   info: RecognizerEngineInfo;
   classify(window: readonly VisionFrame[]): RecognitionCandidate | null;
 }
+
+export const templateRecognizer: RecognizerEngine = {
+  info: {
+    name: "Internal Landmark Template Recognizer",
+    vocabulary: supportedGlosses,
+    isPretrained: false,
+  },
+
+  classify(window) {
+    if (window.length < 8) return null;
+    const match = matchLandmarkTemplate(window);
+    if (!match) return null;
+
+    return {
+      label: match.gloss,
+      confidence: match.confidence,
+      kind: match.gloss.length === 1 ? "letter" : "word",
+    };
+  },
+};
 
 type FingerState = "extended" | "curled";
 
@@ -160,16 +182,7 @@ function isPoint(s: HandShapeFeatures): boolean {
 export const demoRecognizer: RecognizerEngine = {
   info: {
     name: "Rule-Based Demo Recognizer",
-    vocabulary: [
-      "HELLO",
-      "YES",
-      "NO",
-      "THANK YOU",
-      "I LOVE YOU",
-      "STOP",
-      "PLEASE",
-      "HELP",
-    ],
+    vocabulary: supportedGlosses,
     isPretrained: false,
   },
 
@@ -255,8 +268,8 @@ export const demoRecognizer: RecognizerEngine = {
 
 export const fingerspellRecognizer: RecognizerEngine = {
   info: {
-    name: "Static Fingerspelling (subset: A, B, D, I, L, O, Y)",
-    vocabulary: ["A", "B", "D", "I", "L", "O", "Y"],
+    name: "Static Fingerspelling (A-Z catalog, geometry subset active)",
+    vocabulary: "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
     isPretrained: false,
   },
 

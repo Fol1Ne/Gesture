@@ -5,6 +5,7 @@ import {
   Layers,
   MonitorUp,
   Moon,
+  PictureInPicture2,
   Play,
   Square,
   Sun,
@@ -34,7 +35,7 @@ function Toggle({
   return (
     <button
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-white px-3.5 py-3 text-left transition hover:border-[var(--accent)]/40"
+      className="flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3.5 py-3 text-left transition hover:border-[var(--accent)]/40"
     >
       <span className="flex items-center gap-2.5 text-sm text-[var(--text)]">
         {icon}
@@ -63,14 +64,14 @@ export function Settings({ onStart, onStop }: SettingsProps) {
   const isRunning = cameraStatus === "running" || cameraStatus === "loading";
 
   return (
-    <aside className="flex w-full flex-col gap-5 rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm lg:w-[300px]">
+    <aside className="flex w-full flex-col gap-5 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.24)] xl:sticky xl:top-6 xl:w-full xl:self-start">
       <div>
         <h2 className="mb-3 text-sm font-semibold text-[var(--text)]">Capture</h2>
         <div className="flex gap-2">
           {!isRunning ? (
             <button
               onClick={() => onStart(settings.inputSource)}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-3 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-3 py-2.5 text-sm font-semibold text-[#0D1117] transition hover:opacity-90"
             >
               <Play size={15} />
               Start {settings.inputSource === "webcam" ? "Camera" : "Screen Share"}
@@ -78,7 +79,7 @@ export function Settings({ onStart, onStop }: SettingsProps) {
           ) : (
             <button
               onClick={onStop}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#111827] px-3 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--danger)] px-3 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
             >
               <Square size={14} />
               Stop
@@ -92,7 +93,7 @@ export function Settings({ onStart, onStop }: SettingsProps) {
             disabled={isRunning}
             className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 transition disabled:opacity-50 ${
               settings.inputSource === "webcam"
-                ? "bg-white text-[var(--text)] shadow-sm"
+                ? "bg-[var(--card)] text-[var(--text)] shadow-sm"
                 : "text-[var(--muted)]"
             }`}
           >
@@ -104,7 +105,7 @@ export function Settings({ onStart, onStop }: SettingsProps) {
             disabled={isRunning}
             className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 transition disabled:opacity-50 ${
               settings.inputSource === "screen"
-                ? "bg-white text-[var(--text)] shadow-sm"
+                ? "bg-[var(--card)] text-[var(--text)] shadow-sm"
                 : "text-[var(--muted)]"
             }`}
           >
@@ -121,6 +122,12 @@ export function Settings({ onStart, onStop }: SettingsProps) {
           onChange={(v) => updateSettings({ overlayMode: v })}
           label="Overlay mode"
           icon={<Layers size={15} />}
+        />
+        <Toggle
+          checked={settings.pipMode}
+          onChange={(v) => updateSettings({ pipMode: v })}
+          label="Picture-in-Picture"
+          icon={<PictureInPicture2 size={15} />}
         />
         <Toggle
           checked={settings.voiceEnabled}
@@ -146,13 +153,13 @@ export function Settings({ onStart, onStop }: SettingsProps) {
             value={settings.elevenLabsApiKey}
             onChange={(e) => updateSettings({ elevenLabsApiKey: e.target.value })}
             placeholder="sk_..."
-            className="rounded-lg border border-[var(--border)] px-2.5 py-2 text-sm outline-none focus:border-[var(--accent)]"
+            className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
           />
           <label className="mt-1 text-xs font-medium text-[var(--muted)]">Voice</label>
           <select
             value={settings.voiceId}
             onChange={(e) => updateSettings({ voiceId: e.target.value })}
-            className="rounded-lg border border-[var(--border)] px-2.5 py-2 text-sm outline-none focus:border-[var(--accent)]"
+            className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
           >
             {DEFAULT_VOICES.map((v) => (
               <option key={v.voice_id} value={v.voice_id}>

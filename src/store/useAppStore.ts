@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { AppSettings, TranscriptEntry } from "@/types";
+import type { AppSettings, RecognitionDebugMetrics, TranscriptEntry } from "@/types";
+import { databaseCoverage } from "@/lib/database/schema";
 import { DEFAULT_VOICES } from "@/lib/services/speech";
 
 export type CameraStatus = "idle" | "loading" | "running" | "error";
@@ -15,6 +16,7 @@ interface AppState {
   currentConfidence: number;
   fps: number;
   activeSentence: string;
+  debugMetrics: RecognitionDebugMetrics;
 
   // transcript history (finalized sentences)
   transcript: TranscriptEntry[];
@@ -27,6 +29,7 @@ interface AppState {
   setLoadingMessage: (m: string) => void;
   setError: (m: string | null) => void;
   setLiveReadout: (sign: string | null, confidence: number, fps: number) => void;
+  setDebugMetrics: (metrics: Partial<RecognitionDebugMetrics>) => void;
   setActiveSentence: (s: string) => void;
   commitSentence: (text: string) => void;
   clearTranscript: () => void;
@@ -40,8 +43,27 @@ const defaultSettings: AppSettings = {
   confidenceThreshold: 0.6,
   stableFramesRequired: 8,
   overlayMode: false,
-  darkMode: false,
+  pipMode: false,
+  darkMode: true,
   inputSource: "webcam",
+};
+
+const defaultDebugMetrics: RecognitionDebugMetrics = {
+  ...databaseCoverage(),
+  tracking: {
+    face: false,
+    pose: false,
+    leftHand: false,
+    rightHand: false,
+  },
+  recognitionStatus: "idle",
+  frameBufferSize: 0,
+  databaseMatch: 0,
+  landmarkCount: 0,
+  faceLandmarkCount: 0,
+  poseLandmarkCount: 0,
+  leftHandLandmarkCount: 0,
+  rightHandLandmarkCount: 0,
 };
 
 export const useAppStore = create<AppState>((set) => ({
@@ -53,6 +75,7 @@ export const useAppStore = create<AppState>((set) => ({
   currentConfidence: 0,
   fps: 0,
   activeSentence: "",
+  debugMetrics: defaultDebugMetrics,
 
   transcript: [],
 
@@ -63,6 +86,17 @@ export const useAppStore = create<AppState>((set) => ({
   setError: (m) => set({ errorMessage: m, cameraStatus: m ? "error" : "idle" }),
   setLiveReadout: (sign, confidence, fps) =>
     set({ currentSign: sign, currentConfidence: confidence, fps }),
+  setDebugMetrics: (metrics) =>
+    set((state) => ({
+      debugMetrics: {
+        ...state.debugMetrics,
+        ...metrics,
+        tracking: {
+          ...state.debugMetrics.tracking,
+          ...metrics.tracking,
+        },
+      },
+    })),
   setActiveSentence: (s) => set({ activeSentence: s }),
   commitSentence: (text) =>
     set((state) => ({
