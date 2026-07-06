@@ -84,10 +84,11 @@ results into the Zustand store; components just render state.
 - **Voice output** — requires your own ElevenLabs API key, kept in memory only, sent directly to ElevenLabs from the browser.
 - **Overlay mode** — a small draggable floating window showing only the live caption, meant to sit on top of a meeting window.
 - **Webcam / Screen** — switch input source; screen mode is meant for translating another participant's signing during a shared meeting window.
+- **Scalable Database** - Add your own words and watch as the application grows it's vocabulary.
 
 ## Known limitations
 
-- The demo recognizer is geometry-based and single-hand; it will misfire on
+- The demo recognizer is geometry-based; it will misfire on
   signs outside its small vocabulary and won't distinguish subtleties real
   ASL relies on (non-manual markers, two-handed signs, precise trajectories).
 - Fingerspelling covers a small static-letter subset (A, B, D, I, L, O, Y).
@@ -103,3 +104,5 @@ results into the Zustand store; components just render state.
 Static-friendly Next.js app; deploys to Netlify as described in the PRD
 (`npm run build`, publish `.next` with the Next.js Netlify plugin, or
 `next export`-style static hosting if you remove server-only features).
+
+-rights reserved, Andrei S. Alexanded CS. Loic P.
